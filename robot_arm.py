@@ -1,11 +1,11 @@
-from numpy import sin, cos
+from xml.dom.expatbuilder import theDOMImplementation
+from numpy import linspace, sin, cos
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.integrate as integrate
-import matplotlib.animation as animation
 import mpl_toolkits.mplot3d.axes3d as axes3d
 import os
-
+import pprint
+pp = pprint.PrettyPrinter(indent=4)
 
 # Robot class that saves DH parameters
 class Robot:
@@ -49,71 +49,86 @@ def readRobotParams(param_filename):
 # forward kinematics from DH formulat
 def forwardKinematics(robot):
 
+    # Denavit-Hartenberg Parameters
+    def DH(theta, a, d, alpha):
+        T = [
+            [cos(theta), -sin(theta)*cos(alpha),
+                sin(theta)*sin(alpha), a*cos(theta)],
+            [sin(theta), cos(theta)*cos(alpha),
+                -cos(theta)*sin(alpha), a*sin(theta)],
+            [0, sin(alpha), cos(alpha), d],
+            [0, 0, 0, 1]
+            ]
+        return T
+
+    # modified Denavit-Hartenberg Parameters
+    def modDH(theta, a, d, alpha):
+        T = [
+            [cos(theta), -sin(theta),
+                0, a],
+            [sin(theta)*cos(alpha), cos(theta)*cos(alpha),
+                -sin(alpha), -d*sin(alpha)],
+            [sin(theta)*sin(alpha), cos(theta)*sin(alpha),
+                cos(alpha), d*cos(alpha)],
+            [0, 0, 0, 1]
+            ]
+        return T
+
     theta = robot.theta
     a = robot.a
     d = robot.d
     alpha = robot.alpha
 
-    T = []
+    homoTransform = []
     i = 0
     # loop through all joints
     for i in range(len(robot.theta)):
-        T.append(DH(theta[i], a[i], d[i], alpha[i]))
+        T = DH(theta[i], a[i], d[i], alpha[i])
+        homoTransform.append(T)
 
-    return T
-
-
-# Denavit-Hartenberg Parameters
-def DH(theta, a, d, alpha):
-    T = [
-        [cos(theta), -sin(theta)*cos(alpha),
-            sin(theta)*sin(alpha), a*cos(theta)],
-        [sin(theta), cos(theta)*cos(alpha),
-            -cos(theta)*sin(alpha), a*sin(theta)],
-        [0, sin(alpha), cos(alpha), d],
-        [0, 0, 0, 1]
-        ]
-    return T
-
-
-# modified Denavit-Hartenberg Parameters
-def modDH(theta, a, d, alpha):
-    T = [
-        [cos(theta), -sin(theta),
-            0, a],
-        [sin(theta)*cos(alpha), cos(theta)*cos(alpha),
-            -sin(alpha), -d*sin(alpha)],
-        [sin(theta)*sin(alpha), cos(theta)*sin(alpha),
-            cos(alpha), d*cos(alpha)],
-        [0, 0, 0, 1]
-        ]
-    return T
-
-
-# Jacobian matrix from DH parameters
-def jacobian(robot):
-
-    return False
-
-
-# Inverse Kinematics
-def inverseKinematics(robot):
-
-    return False
+    return homoTransform
 
 
 # draw x-y-z axes at joints
-def drawJointAxes(fwd_kin):
+def getJointAxes(theta):
+    x = []
+    y = []
+    z = []
+    u = []
+    v = []
+    w = []
+    color = []
 
-    # draw unit axes
-    ax.quiver(0, 0, 0, 1, 0, 0, color='r', length=0.1, normalize=True)
-    ax.quiver(0, 0, 0, 0, 1, 0, color='g', length=0.1, normalize=True)
-    ax.quiver(0, 0, 0, 0, 0, 1, color='b', length=0.1, normalize=True)
+    # origin axes
+    for i in range(3):
+        x.append(0)
+        y.append(0)
+        z.append(0)
 
-    unit_x = [1, 0, 0, 0]
-    unit_y = [0, 1, 0, 0]
-    unit_z = [0, 0, 1, 0]
-    origin = [0, 0, 0, 1]
+        if i==0:
+            u.append(1)
+            v.append(0)
+            w.append(0)
+            color.extend('r')
+        elif i==1:
+            u.append(0)
+            v.append(1)
+            w.append(0)
+            color.extend('g')
+        else:
+            u.append(0)
+            v.append(0)
+            w.append(1)
+            color.extend('b')
+
+    # robot axes
+    unit_x = [1., 0., 0., 0.]
+    unit_y = [0., 1., 0., 0.]
+    unit_z = [0., 0., 1., 0.]
+    origin = [0., 0., 0., 1.]
+
+    robot.theta = theta
+    fwd_kin = forwardKinematics(robot)
 
     for i in range(len(fwd_kin)):
         if i==0:
@@ -121,36 +136,42 @@ def drawJointAxes(fwd_kin):
         else:
             fwd_kin_chain = np.matmul(fwd_kin_chain, fwd_kin[i])
 
-        x, y, z, one = np.matmul(fwd_kin_chain, np.transpose(origin))
+        tmp_x, tmp_y, tmp_z, one = np.matmul(fwd_kin_chain, np.transpose(origin))
+        ux, vx, wx, one = np.matmul(fwd_kin_chain, np.transpose(unit_x))
+        uy, vy, wy, one = np.matmul(fwd_kin_chain, np.transpose(unit_y))
+        uz, vz, wz, one = np.matmul(fwd_kin_chain, np.transpose(unit_z))
 
-        xu, xv, xw, one = np.matmul(fwd_kin_chain, np.transpose(unit_x))
-        yu, yv, yw, one = np.matmul(fwd_kin_chain, np.transpose(unit_y))
-        zu, zv, zw, one = np.matmul(fwd_kin_chain, np.transpose(unit_z))
-
-        if i==5:
-            ax.quiver(x, y, z, xu, xv, xw, color='r', length=0.1, normalize=True)
-            ax.quiver(x, y, z, yu, yv, yw, color='g', length=0.1, normalize=True)
-            ax.quiver(x, y, z, zu, zv, zw, color='b', length=0.1, normalize=True)
-
-
-# Inverse of homogeneous transformation
-def invHomoTransform(matrix):
-    rot = matrix[0:3, 0:3]
-    tran = matrix[0:3, 3]
-
-    inverse = np.diag(4)
-
-    return inverse
-
-
-# animate the change in joint angles
-def animate(robot):
+        x.extend([tmp_x, tmp_x, tmp_x])
+        y.extend([tmp_y, tmp_y, tmp_y])
+        z.extend([tmp_z, tmp_z, tmp_z])
+        u.extend([ux, uy, uz])
+        v.extend([vx, vy, vz])
+        w.extend([wx, wy, wz])
+        color.extend(['r','g','b'])
     
-    robot.theta[0] = [robot.theta[0] + 0.1]
-    fwd_kin = forwardKinematics(robot)
+    return x, y, z, u, v, w, color
 
-    drawJointAxes(fwd_kin)
-    return robot
+
+def initPlot():
+    ax.set_title(robot.name)
+
+    # Setting the axes properties
+    ax.set_xlim3d([-1.0, 1.0])
+    ax.set_xlabel('X')
+    ax.set_ylim3d([-1.0, 1.0])
+    ax.set_ylabel('Y')
+    ax.set_zlim3d([-1.0, 1.0])
+    ax.set_zlabel('Z')
+
+
+def data_for_cylinder_along_z(center_x,center_y,radius,height_z):
+    z = np.linspace(0, height_z, 9)
+    theta = np.linspace(0, 2*np.pi, 9)
+    theta_grid, z_grid=np.meshgrid(theta, z)
+    x_grid = radius*np.cos(theta_grid) + center_x
+    y_grid = radius*np.sin(theta_grid) + center_y
+
+    return x_grid,y_grid,z_grid
 
 
 # ----- Main function --------------------------------
@@ -161,54 +182,63 @@ param_filename = 'ur16e.txt'
 
 
 # Attaching 3D axis to the figure
-fig = plt.figure()
 elev = 35
 azim = 60
-ax = plt.axes(projection="3d", elev=elev, azim=azim)
+fig, ax = plt.subplots(subplot_kw=dict(projection="3d", elev=elev, azim=azim))
 
-# Setting the axes properties
-ax.set_xlim3d([-1.0, 1.0])
-ax.set_xlabel('X')
-
-ax.set_ylim3d([-1.0, 1.0])
-ax.set_ylabel('Y')
-
-ax.set_zlim3d([-1.0, 1.0])
-ax.set_zlabel('Z')
-
-
+global robot
 robot = readRobotParams(param_filename)
-ax.set_title(robot.name)
-fwd_kin = forwardKinematics(robot)
-drawJointAxes(fwd_kin)
 
+theta = np.zeros(len(robot.theta))
+for i in linspace(0, 2*np.pi, 30):
+    theta[0] = i
 
-for i in range(50):
-    for j in range(2):
-        robot.theta[j] = robot.theta[j] + 2*np.pi/50
-    fwd_kin = forwardKinematics(robot)
-    
-    '''
+    x, y, z, u, v, w, colors = getJointAxes(theta)
+
     plt.cla()
-    # Setting the axes properties
-    ax.set_xlim3d([-1.0, 1.0])
-    ax.set_xlabel('X')
+    initPlot()
+    for i in np.arange(0,len(x)):
+        ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
+            color=colors[i], length=0.1, normalize=True)
 
-    ax.set_ylim3d([-1.0, 1.0])
-    ax.set_ylabel('Y')
+    for i in range(len(robot.a)):
+        def transformTube(Xc,Yc,Zc, T):
+            Xc = Xc.flatten()
+            Yc = Yc.flatten()
+            Zc = Zc.flatten()
+            ones = np.ones(len(Xc))
+            tube = np.vstack([Xc, Yc, Zc, ones])
 
-    ax.set_zlim3d([-1.0, 1.0])
-    ax.set_zlabel('Z')
-    '''
-    drawJointAxes(fwd_kin)
-    plt.draw()
-    plt.pause(0.01)
+            T
 
-'''
-ani = animation.FuncAnimation(fig, animate(robot), np.arange(1, 400),
-                              interval=25, blit=True)
-'''
+            Xc = tube[0,:]
+            Yc = tube[1,:]
+            Zc = tube[2,:]
 
-# ani.save('double_pendulum.mp4', fps=15)
+            r = np.sqrt(len(Xc))
+            sz = (r, r)
+
+            Xc = np.reshape(Xc,sz)
+            Yc = np.reshape(Yc,sz)
+            Zc = np.reshape(Zc,sz)
+
+            return Xc,Yc,Zc
+
+        Xc,Yc,Zc = data_for_cylinder_along_z(i/10,0.,0.04,abs(robot.a[i]))
+        
+        ax.plot_surface(Xc, Yc, Zc, alpha=0.5)
+        
+        Xc,Yc,Zc = data_for_cylinder_along_z(0,i/10,0.04,abs(robot.d[i]))
+
+        ax.plot_surface(Xc, Yc, Zc, alpha=0.5)
+
+        
+        
+
+        fwd_kin = forwardKinematics(robot)
+        pp.pprint(np.around(fwd_kin[0],3))
+
+    plt.pause(0.03)
+
 
 plt.show()
