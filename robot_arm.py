@@ -1,3 +1,4 @@
+from re import I
 from xml.dom.expatbuilder import theDOMImplementation
 from numpy import linspace, sin, cos
 import numpy as np
@@ -177,7 +178,7 @@ def data_for_cylinder_along_z(center_x,center_y,radius,height_z):
 # ----- Main function --------------------------------
 param_filename = '3R.txt'
 param_filename = 'ur16e.txt'
-#param_filename = 'ur5e.txt'
+param_filename = 'ur5e.txt'
 #param_filename = '5R1P.txt'
 
 
@@ -190,8 +191,9 @@ global robot
 robot = readRobotParams(param_filename)
 
 theta = np.zeros(len(robot.theta))
-for i in linspace(0, 2*np.pi, 30):
-    theta[0] = i
+for i in linspace(0, -np.pi/2, 50):
+    theta[1:4] = i
+    #theta[1] = i
 
     x, y, z, u, v, w, colors = getJointAxes(theta)
 
@@ -202,43 +204,60 @@ for i in linspace(0, 2*np.pi, 30):
             color=colors[i], length=0.1, normalize=True)
 
     for i in range(len(robot.a)):
-        def transformTube(Xc,Yc,Zc, T):
+        def transformTube(Xc,Yc,Zc, transform):
             Xc = Xc.flatten()
             Yc = Yc.flatten()
             Zc = Zc.flatten()
             ones = np.ones(len(Xc))
             tube = np.vstack([Xc, Yc, Zc, ones])
 
-            T
+            tube = np.matmul(transform,tube)
 
             Xc = tube[0,:]
             Yc = tube[1,:]
             Zc = tube[2,:]
 
-            r = np.sqrt(len(Xc))
-            sz = (r, r)
+            r = int(np.sqrt(len(Xc)))
 
-            Xc = np.reshape(Xc,sz)
-            Yc = np.reshape(Yc,sz)
-            Zc = np.reshape(Zc,sz)
+            Xc = np.reshape(Xc,[r,r])
+            Yc = np.reshape(Yc,[r,r])
+            Zc = np.reshape(Zc,[r,r])
 
             return Xc,Yc,Zc
 
-        Xc,Yc,Zc = data_for_cylinder_along_z(i/10,0.,0.04,abs(robot.a[i]))
-        
-        ax.plot_surface(Xc, Yc, Zc, alpha=0.5)
-        
-        Xc,Yc,Zc = data_for_cylinder_along_z(0,i/10,0.04,abs(robot.d[i]))
-
-        ax.plot_surface(Xc, Yc, Zc, alpha=0.5)
-
-        
-        
-
         fwd_kin = forwardKinematics(robot)
-        pp.pprint(np.around(fwd_kin[0],3))
+        if i==0:
+            fwd_kin_chain = fwd_kin[0]
+        else:
+            fwd_kin_chain = np.matmul(fwd_kin_chain, fwd_kin[i])
 
-    plt.pause(0.03)
+        if abs(robot.d[i]) > abs(robot.a[i]):
+            height_z = robot.d[i]
+            T = [
+                [1,0,0,0],
+                [0,0,-1,0],
+                [0,1,0,0],
+                [0,0,0,1]
+            ]
+                
+            transform = np.matmul(fwd_kin_chain, T)
+        else:
+            height_z = robot.a[i]
+            T = [
+                [0,0,-1,0],
+                [0,1,0,0],
+                [1,0,0,0],
+                [0,0,0,1]
+            ]
+            transform = np.matmul(fwd_kin_chain, T)
+
+        Xc,Yc,Zc = data_for_cylinder_along_z(0,0,0.04,height_z)
+        Xc,Yc,Zc = transformTube(Xc,Yc,Zc,transform)
+        ax.plot_surface(Xc, Yc, Zc, alpha=0.5)
+
+        #pp.pprint(np.around(fwd_kin[i],3))
+
+    plt.pause(0.01)
 
 
 plt.show()
