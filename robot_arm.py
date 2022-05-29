@@ -18,7 +18,7 @@ class Robot:
 
 
 # Save the DH parameters from a text file
-def read_robot_params(param_filename):
+def readRobotParams(param_filename):
     # Find text file with robot parameters
     cwd = os.getcwd()
     filename = cwd + '/robot_sim/' + param_filename
@@ -46,34 +46,125 @@ def read_robot_params(param_filename):
     return robot
 
 
-# forward kinematics
-def FK(rbt):
+# forward kinematics from DH formulat
+def forwardKinematics(robot):
 
     theta = robot.theta
     a = robot.a
     d = robot.d
     alpha = robot.alpha
 
-    T = np.array([
-        [cos(theta), -sin(theta)*cos(alpha), sin(theta)*sin(alpha), a*cos(theta)],
-        [sin(theta), cos(theta)*cos(alpha), -cos(theta)*sin(alpha), a*sin(theta)],
+    T = []
+    i = 0
+    # loop through all joints
+    for i in range(len(robot.theta)):
+        T.append(DH(theta[i], a[i], d[i], alpha[i]))
+
+    return T
+
+
+# Denavit-Hartenberg Parameters
+def DH(theta, a, d, alpha):
+    T = [
+        [cos(theta), -sin(theta)*cos(alpha),
+            sin(theta)*sin(alpha), a*cos(theta)],
+        [sin(theta), cos(theta)*cos(alpha),
+            -cos(theta)*sin(alpha), a*sin(theta)],
         [0, sin(alpha), cos(alpha), d],
         [0, 0, 0, 1]
-    ])
+        ]
+    return T
 
 
-# Main function
-param_filename = 'ur10e_parameters.txt'
-robot = read_robot_params(param_filename)
+# modified Denavit-Hartenberg Parameters
+def modDH(theta, a, d, alpha):
+    T = [
+        [cos(theta), -sin(theta),
+            0, a],
+        [sin(theta)*cos(alpha), cos(theta)*cos(alpha),
+            -sin(alpha), -d*sin(alpha)],
+        [sin(theta)*sin(alpha), cos(theta)*sin(alpha),
+            cos(alpha), d*cos(alpha)],
+        [0, 0, 0, 1]
+        ]
+    return T
 
-print(robot.theta)
+
+# Jacobian matrix from DH parameters
+def jacobian(robot):
+
+    return False
+
+
+# Inverse Kinematics
+def inverseKinematics(robot):
+
+    return False
+
+
+# draw x-y-z axes at joints
+def drawJointAxes(fwd_kin):
+
+    # draw unit axes
+    ax.quiver(0, 0, 0, 1, 0, 0, color='r', length=0.1, normalize=True)
+    ax.quiver(0, 0, 0, 0, 1, 0, color='g', length=0.1, normalize=True)
+    ax.quiver(0, 0, 0, 0, 0, 1, color='b', length=0.1, normalize=True)
+
+    unit_x = [1, 0, 0, 0]
+    unit_y = [0, 1, 0, 0]
+    unit_z = [0, 0, 1, 0]
+    origin = [0, 0, 0, 1]
+
+    for i in range(len(fwd_kin)):
+        if i==0:
+            fwd_kin_chain = fwd_kin[0]
+        else:
+            fwd_kin_chain = np.matmul(fwd_kin_chain, fwd_kin[i])
+
+        x, y, z, one = np.matmul(fwd_kin_chain, np.transpose(origin))
+
+        xu, xv, xw, one = np.matmul(fwd_kin_chain, np.transpose(unit_x))
+        yu, yv, yw, one = np.matmul(fwd_kin_chain, np.transpose(unit_y))
+        zu, zv, zw, one = np.matmul(fwd_kin_chain, np.transpose(unit_z))
+
+        if i==5:
+            ax.quiver(x, y, z, xu, xv, xw, color='r', length=0.1, normalize=True)
+            ax.quiver(x, y, z, yu, yv, yw, color='g', length=0.1, normalize=True)
+            ax.quiver(x, y, z, zu, zv, zw, color='b', length=0.1, normalize=True)
+
+
+# Inverse of homogeneous transformation
+def invHomoTransform(matrix):
+    rot = matrix[0:3, 0:3]
+    tran = matrix[0:3, 3]
+
+    inverse = np.diag(4)
+
+    return inverse
+
+
+# animate the change in joint angles
+def animate(robot):
+    
+    robot.theta[0] = [robot.theta[0] + 0.1]
+    fwd_kin = forwardKinematics(robot)
+
+    drawJointAxes(fwd_kin)
+    return robot
+
+
+# ----- Main function --------------------------------
+param_filename = '3R.txt'
+param_filename = 'ur16e.txt'
+#param_filename = 'ur5e.txt'
+#param_filename = '5R1P.txt'
+
 
 # Attaching 3D axis to the figure
 fig = plt.figure()
 elev = 35
 azim = 60
-ax = fig.add_subplot(111, projection="3d", elev=elev, azim=azim)
-ax.set_position([0, 0, 0.95, 1])
+ax = plt.axes(projection="3d", elev=elev, azim=azim)
 
 # Setting the axes properties
 ax.set_xlim3d([-1.0, 1.0])
@@ -85,32 +176,39 @@ ax.set_ylabel('Y')
 ax.set_zlim3d([-1.0, 1.0])
 ax.set_zlabel('Z')
 
-ax.set_title('3D Test')
+
+robot = readRobotParams(param_filename)
+ax.set_title(robot.name)
+fwd_kin = forwardKinematics(robot)
+drawJointAxes(fwd_kin)
+
+
+for i in range(50):
+    for j in range(2):
+        robot.theta[j] = robot.theta[j] + 2*np.pi/50
+    fwd_kin = forwardKinematics(robot)
+    
+    '''
+    plt.cla()
+    # Setting the axes properties
+    ax.set_xlim3d([-1.0, 1.0])
+    ax.set_xlabel('X')
+
+    ax.set_ylim3d([-1.0, 1.0])
+    ax.set_ylabel('Y')
+
+    ax.set_zlim3d([-1.0, 1.0])
+    ax.set_zlabel('Z')
+    '''
+    drawJointAxes(fwd_kin)
+    plt.draw()
+    plt.pause(0.01)
 
 '''
-# Creating the Animation object
-line_ani = animation.FuncAnimation(fig, update_lines, 25, fargs=(data, lines),
-                                   interval=50, blit=False)
+ani = animation.FuncAnimation(fig, animate(robot), np.arange(1, 400),
+                              interval=25, blit=True)
 '''
 
-# Make the grid
-x, y, z = np.meshgrid(np.arange(-0.8, 1, 0.2),
-                      np.arange(-0.8, 1, 0.2),
-                      np.arange(-0.8, 1, 0.8))
-
-# Make the direction data for the arrows
-u = np.sin(np.pi * x) * np.cos(np.pi * y) * np.cos(np.pi * z)
-v = -np.cos(np.pi * x) * np.sin(np.pi * y) * np.cos(np.pi * z)
-w = (np.sqrt(2.0 / 3.0) * np.cos(np.pi * x) * np.cos(np.pi * y) *
-     np.sin(np.pi * z))
-
-ax.quiver(x, y, z, u, v, w, length=0.1, normalize=True)
-
-'''
-V = np.array([[1,1], [-2,2], [4,-7]])
-origin = np.array([[0, 0, 0],[0, 0, 0]]) # origin point
-
-plt.quiver(*origin, V[:,0], V[:,1], color=['r','b','g'], scale=21)
-'''
 # ani.save('double_pendulum.mp4', fps=15)
+
 plt.show()
