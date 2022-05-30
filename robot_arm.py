@@ -175,11 +175,11 @@ def plotAxes():
             ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
                 color=colors[i], length=0.2, normalize=True)
         else:
-            #if i>=len(x)-3:
-            #    ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
-            #        color=colors[i], length=0.1, normalize=True)
-            ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
+            if i>=len(x)-3:
+                ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
                     color=colors[i], length=0.1, normalize=True)
+            #ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
+            #        color=colors[i], length=0.1, normalize=True)
 
 
 # plot each link
@@ -315,18 +315,14 @@ limit = 0.8
 initPlot()
 
 origin = np.zeros(len(robot.theta))
-home = [pi, -pi/8, -pi/2, pi, 0, 0]
+home = [0, 0, 0, 0, 0, 0]
 
 start = home
-stop = [pi/3, -pi/2, -pi/5, pi/2, 0, 0]
-interval = 20
+stop = [2*pi, 2*pi, 0, 0, 0, 0]
+interval = 80
 
-simplePath(start, stop, interval, show_path=False)
-simplePath(stop, start, interval, show_path=False)
-simplePath(start, stop, interval, show_path=False)
-simplePath(stop, start, interval, show_path=False)
-simplePath(start, stop, interval, show_path=False)
-simplePath(stop, start, interval, show_path=False)
+simplePath(start, stop, interval, show_path=True)
+
 
 '''
 for i in range(len(robot.theta)):
