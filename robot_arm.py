@@ -96,12 +96,12 @@ def initPlot():
     ax.set_title(robot.name)
 
     # Setting the axes properties
-    ax.set_xlim3d([-1.0, 1.0])
-    ax.set_xlabel('X')
-    ax.set_ylim3d([-1.0, 1.0])
-    ax.set_ylabel('Y')
-    ax.set_zlim3d([-1.0, 1.0])
-    ax.set_zlabel('Z')
+    ax.set_xlim3d([-limit, limit])
+    ax.set_xlabel('X (m)')
+    ax.set_ylim3d([-limit, limit])
+    ax.set_ylabel('Y (m)')
+    ax.set_zlim3d([-limit, limit])
+    ax.set_zlabel('Z (m)')
 
 
 # plot each joint axes
@@ -171,12 +171,15 @@ def plotAxes():
     x, y, z, u, v, w, colors = getJointAxes(robot.theta)
 
     for i in np.arange(0,len(x)):
-        if i<3:
+        if i<=2:
             ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
                 color=colors[i], length=0.2, normalize=True)
         else:
+            #if i>=len(x)-3:
+            #    ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
+            #        color=colors[i], length=0.1, normalize=True)
             ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
-                color=colors[i], length=0.1, normalize=True)
+                    color=colors[i], length=0.1, normalize=True)
 
 
 # plot each link
@@ -214,30 +217,43 @@ def plotLinks():
 
             return Xc,Yc,Zc
 
+    
+    fwd_kin = forwardKinematics(robot)
+
     # loop through each link
     for i in range(len(robot.a)):
-        fwd_kin = forwardKinematics(robot)
-
         if i==0:
-            fwd_kin_chain = fwd_kin[0]
+            fwd_kin_chain = np.array(fwd_kin[i])
+            
         else:
             fwd_kin_chain = np.matmul(fwd_kin_chain, fwd_kin[i])
 
         if abs(robot.d[i]) > abs(robot.a[i]):
-            height_z = robot.d[i]
-            T = [[1,0,0,0],
-                [0,0,-1,0],
-                [0,1,0,0],
-                [0,0,0,1]]
-                
-            transform = np.matmul(fwd_kin_chain, T)
+            if robot.alpha[i] != 0:
+                height_z = robot.d[i]
+                T = [
+                    [1,0,0,0],
+                    [0,cos(robot.alpha[i]),-sin(robot.alpha[i]),0],
+                    [0,sin(robot.alpha[i]),cos(robot.alpha[i]),0],
+                    [0,0,0,1]
+                ]
+            else:
+                height_z = -robot.d[i]
+                T = np.eye(4)
         else:
-            height_z = robot.a[i]
-            T = [[0,0,-1,0],
-                [0,1,0,0],
-                [1,0,0,0],
-                [0,0,0,1]]
-            transform = np.matmul(fwd_kin_chain, T)
+            if robot.alpha[i] == 0:
+                height_z = robot.a[i]
+                T = [
+                    [0,0,-1,0],
+                    [0,1,0,0],
+                    [1,0,0,0],
+                    [0,0,0,1]
+                ]
+            else:
+                height_z = robot.a[i]
+                T = np.eye(4)
+
+        transform = np.matmul(fwd_kin_chain, T)
 
         Xc,Yc,Zc = data_for_cylinder_along_z(0,0,0.04,height_z)
         Xc,Yc,Zc = transformTube(Xc,Yc,Zc,transform)
@@ -250,21 +266,23 @@ def setJointPosition(theta):
         robot.theta[i] = theta[i]
 
 
-def moveJoints(theta):
+def animateJoints(theta, show_path):
     setJointPosition(theta)
 
-    plt.cla()
-    initPlot()
-    plotAxes()
-    plotLinks()
+    if show_path:
+        plotAxes()
+    else:
+        plt.cla()
+        initPlot()
+        plotAxes()
+        plotLinks()
+        plt.pause(0.01)
 
-    plt.pause(0.01)
 
-
-def simplePath(start, stop):
+def simplePath(start, stop, interval, show_path):
     joints = []
-    interval = 50
-    for i in range(len(start)):
+    for i in range(len(robot.theta)):
+        print(i)
 
         q = linspace(start[i], stop[i], interval)
         if i==0:
@@ -274,7 +292,7 @@ def simplePath(start, stop):
 
     for i in range(interval):
         theta = thetas[:,i]
-        moveJoints(theta)
+        animateJoints(theta, show_path)
 
 
 # ----- Main function --------------------------------
@@ -285,16 +303,38 @@ param_filename = 'ur16e.txt'
 #param_filename = 'quad.txt'
 
 # Attaching 3D axis to the figure
-elev = 25
+elev = 20
 azim = 60
 fig, ax = plt.subplots(subplot_kw=dict(projection="3d", elev=elev, azim=azim))
 
 global robot
 robot = readRobotParams(param_filename)
 
-start = [0, 0, 0, 0, 0, 0]
-stop = [8*pi, -3*pi/5, pi/2, 0.5, 0, 0]
-simplePath(start, stop)
+global limit
+limit = 0.8
+initPlot()
+
+origin = np.zeros(len(robot.theta))
+home = [pi, -pi/8, -pi/2, pi, 0, 0]
+
+start = home
+stop = [pi/3, -pi/2, -pi/5, pi/2, 0, 0]
+interval = 20
+
+simplePath(start, stop, interval, show_path=False)
+simplePath(stop, start, interval, show_path=False)
+simplePath(start, stop, interval, show_path=False)
+simplePath(stop, start, interval, show_path=False)
+simplePath(start, stop, interval, show_path=False)
+simplePath(stop, start, interval, show_path=False)
+
+'''
+for i in range(len(robot.theta)):
+    stop[i] = -pi
+    simplePath(start, stop, interval, show_path=False)
+    simplePath(stop, start, interval, show_path=False)
+    stop[i] = home[i]
+'''
 plt.show()
 
 #pp.pprint(np.around(fwd_kin[i],3))
