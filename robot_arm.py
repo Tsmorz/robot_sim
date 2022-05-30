@@ -1,17 +1,17 @@
-from re import I
-from xml.dom.expatbuilder import theDOMImplementation
-from numpy import linspace, sin, cos
+from numpy import linspace, sin, cos, pi
 import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as axes3d
 import os
+
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
 # Robot class that saves DH parameters
 class Robot:
-    def __init__(self, name, theta, a, d, alpha):
+    def __init__(self, name, joint, theta, a, d, alpha):
         self.name = name
+        self.joint = joint
         self.theta = theta
         self.a = a
         self.d = d
@@ -24,6 +24,7 @@ def readRobotParams(param_filename):
     cwd = os.getcwd()
     filename = cwd + '/robot_sim/' + param_filename
 
+    joint = []
     theta = []
     a = []
     d = []
@@ -36,13 +37,14 @@ def readRobotParams(param_filename):
                 name = line
             if lines > 1:
                 params = line.split()
-                theta.append(float(params[0]))
-                a.append(float(params[1]))
-                d.append(float(params[2]))
-                alpha.append(float(params[3]))
+                joint.append(str(params[0]))
+                theta.append(float(params[1]))
+                a.append(float(params[2]))
+                d.append(float(params[3]))
+                alpha.append(float(params[4]))
             lines+=1
 
-    robot = Robot(name, theta, a, d, alpha)
+    robot = Robot(name, joint, theta, a, d, alpha)
 
     return robot
 
@@ -90,69 +92,6 @@ def forwardKinematics(robot):
     return homoTransform
 
 
-# draw x-y-z axes at joints
-def getJointAxes(theta):
-    x = []
-    y = []
-    z = []
-    u = []
-    v = []
-    w = []
-    color = []
-
-    # origin axes
-    for i in range(3):
-        x.append(0)
-        y.append(0)
-        z.append(0)
-
-        if i==0:
-            u.append(1)
-            v.append(0)
-            w.append(0)
-            color.extend('r')
-        elif i==1:
-            u.append(0)
-            v.append(1)
-            w.append(0)
-            color.extend('g')
-        else:
-            u.append(0)
-            v.append(0)
-            w.append(1)
-            color.extend('b')
-
-    # robot axes
-    unit_x = [1., 0., 0., 0.]
-    unit_y = [0., 1., 0., 0.]
-    unit_z = [0., 0., 1., 0.]
-    origin = [0., 0., 0., 1.]
-
-    robot.theta = theta
-    fwd_kin = forwardKinematics(robot)
-
-    for i in range(len(fwd_kin)):
-        if i==0:
-            fwd_kin_chain = fwd_kin[0]
-        else:
-            fwd_kin_chain = np.matmul(fwd_kin_chain, fwd_kin[i])
-
-        tmp_x, tmp_y, tmp_z, one = np.matmul(fwd_kin_chain, np.transpose(origin))
-        ux, vx, wx, one = np.matmul(fwd_kin_chain, np.transpose(unit_x))
-        uy, vy, wy, one = np.matmul(fwd_kin_chain, np.transpose(unit_y))
-        uz, vz, wz, one = np.matmul(fwd_kin_chain, np.transpose(unit_z))
-
-        x.extend([tmp_x, tmp_x, tmp_x])
-        y.extend([tmp_y, tmp_y, tmp_y])
-        z.extend([tmp_z, tmp_z, tmp_z])
-        u.extend([ux, uy, uz])
-        v.extend([vx, vy, vz])
-        w.extend([wx, wy, wz])
-        color.extend(['r','g','b'])
-    
-    return x, y, z, u, v, w, color
-
-
 def initPlot():
     ax.set_title(robot.name)
 
@@ -165,46 +104,96 @@ def initPlot():
     ax.set_zlabel('Z')
 
 
-def data_for_cylinder_along_z(center_x,center_y,radius,height_z):
-    z = np.linspace(0, height_z, 9)
-    theta = np.linspace(0, 2*np.pi, 9)
-    theta_grid, z_grid=np.meshgrid(theta, z)
-    x_grid = radius*np.cos(theta_grid) + center_x
-    y_grid = radius*np.sin(theta_grid) + center_y
+# plot each joint axes
+def plotAxes():
+    # draw x-y-z axes at joints
+    def getJointAxes(theta):
+        x = []
+        y = []
+        z = []
+        u = []
+        v = []
+        w = []
+        color = []
 
-    return x_grid,y_grid,z_grid
+        # origin axes
+        for i in range(3):
+            x.append(0)
+            y.append(0)
+            z.append(0)
 
+            if i==0:
+                u.append(1)
+                v.append(0)
+                w.append(0)
+                color.extend('r')
+            elif i==1:
+                u.append(0)
+                v.append(1)
+                w.append(0)
+                color.extend('g')
+            else:
+                u.append(0)
+                v.append(0)
+                w.append(1)
+                color.extend('b')
 
-# ----- Main function --------------------------------
-param_filename = '3R.txt'
-param_filename = 'ur16e.txt'
-param_filename = 'ur5e.txt'
-#param_filename = '5R1P.txt'
+        # robot axes
+        unit_x = [1., 0., 0., 0.]
+        unit_y = [0., 1., 0., 0.]
+        unit_z = [0., 0., 1., 0.]
+        origin = [0., 0., 0., 1.]
 
+        robot.theta = theta
+        fwd_kin = forwardKinematics(robot)
 
-# Attaching 3D axis to the figure
-elev = 35
-azim = 60
-fig, ax = plt.subplots(subplot_kw=dict(projection="3d", elev=elev, azim=azim))
+        for i in range(len(fwd_kin)):
+            if i==0:
+                fwd_kin_chain = fwd_kin[0]
+            else:
+                fwd_kin_chain = np.matmul(fwd_kin_chain, fwd_kin[i])
 
-global robot
-robot = readRobotParams(param_filename)
+            tmp_x, tmp_y, tmp_z, one = np.matmul(fwd_kin_chain, np.transpose(origin))
+            ux, vx, wx, one = np.matmul(fwd_kin_chain, np.transpose(unit_x))
+            uy, vy, wy, one = np.matmul(fwd_kin_chain, np.transpose(unit_y))
+            uz, vz, wz, one = np.matmul(fwd_kin_chain, np.transpose(unit_z))
 
-theta = np.zeros(len(robot.theta))
-for i in linspace(0, -np.pi/2, 50):
-    theta[1:4] = i
-    #theta[1] = i
+            x.extend([tmp_x, tmp_x, tmp_x])
+            y.extend([tmp_y, tmp_y, tmp_y])
+            z.extend([tmp_z, tmp_z, tmp_z])
+            u.extend([ux, uy, uz])
+            v.extend([vx, vy, vz])
+            w.extend([wx, wy, wz])
+            color.extend(['r','g','b'])
+        
+        return x, y, z, u, v, w, color
 
-    x, y, z, u, v, w, colors = getJointAxes(theta)
+    x, y, z, u, v, w, colors = getJointAxes(robot.theta)
 
-    plt.cla()
-    initPlot()
     for i in np.arange(0,len(x)):
-        ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
-            color=colors[i], length=0.1, normalize=True)
+        if i<3:
+            ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
+                color=colors[i], length=0.2, normalize=True)
+        else:
+            ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
+                color=colors[i], length=0.1, normalize=True)
 
-    for i in range(len(robot.a)):
-        def transformTube(Xc,Yc,Zc, transform):
+
+# plot each link
+def plotLinks():
+
+    # create robot links
+    def data_for_cylinder_along_z(center_x,center_y,radius,height_z):
+        z = np.linspace(0, height_z, 10)
+        theta = np.linspace(0, 2*np.pi, 10)
+        theta_grid, z_grid=np.meshgrid(theta, z)
+        x_grid = radius*np.cos(theta_grid) + center_x
+        y_grid = radius*np.sin(theta_grid) + center_y
+
+        return x_grid,y_grid,z_grid
+
+    # tranform links
+    def transformTube(Xc,Yc,Zc, transform):
             Xc = Xc.flatten()
             Yc = Yc.flatten()
             Zc = Zc.flatten()
@@ -225,7 +214,10 @@ for i in linspace(0, -np.pi/2, 50):
 
             return Xc,Yc,Zc
 
+    # loop through each link
+    for i in range(len(robot.a)):
         fwd_kin = forwardKinematics(robot)
+
         if i==0:
             fwd_kin_chain = fwd_kin[0]
         else:
@@ -233,31 +225,76 @@ for i in linspace(0, -np.pi/2, 50):
 
         if abs(robot.d[i]) > abs(robot.a[i]):
             height_z = robot.d[i]
-            T = [
-                [1,0,0,0],
+            T = [[1,0,0,0],
                 [0,0,-1,0],
                 [0,1,0,0],
-                [0,0,0,1]
-            ]
+                [0,0,0,1]]
                 
             transform = np.matmul(fwd_kin_chain, T)
         else:
             height_z = robot.a[i]
-            T = [
-                [0,0,-1,0],
+            T = [[0,0,-1,0],
                 [0,1,0,0],
                 [1,0,0,0],
-                [0,0,0,1]
-            ]
+                [0,0,0,1]]
             transform = np.matmul(fwd_kin_chain, T)
 
         Xc,Yc,Zc = data_for_cylinder_along_z(0,0,0.04,height_z)
         Xc,Yc,Zc = transformTube(Xc,Yc,Zc,transform)
         ax.plot_surface(Xc, Yc, Zc, alpha=0.5)
 
-        #pp.pprint(np.around(fwd_kin[i],3))
+
+# set robot joint positions
+def setJointPosition(theta):
+    for i in range(len(robot.theta)):
+        robot.theta[i] = theta[i]
+
+
+def moveJoints(theta):
+    setJointPosition(theta)
+
+    plt.cla()
+    initPlot()
+    plotAxes()
+    plotLinks()
 
     plt.pause(0.01)
 
 
+def simplePath(start, stop):
+    joints = []
+    interval = 50
+    for i in range(len(start)):
+
+        q = linspace(start[i], stop[i], interval)
+        if i==0:
+            thetas = q
+        else:
+            thetas = np.vstack([thetas, q])
+
+    for i in range(interval):
+        theta = thetas[:,i]
+        moveJoints(theta)
+
+
+# ----- Main function --------------------------------
+param_filename = '3R.txt'
+param_filename = 'ur16e.txt'
+#param_filename = 'ur5e.txt'
+#param_filename = '5R1P.txt'
+#param_filename = 'quad.txt'
+
+# Attaching 3D axis to the figure
+elev = 25
+azim = 60
+fig, ax = plt.subplots(subplot_kw=dict(projection="3d", elev=elev, azim=azim))
+
+global robot
+robot = readRobotParams(param_filename)
+
+start = [0, 0, 0, 0, 0, 0]
+stop = [8*pi, -3*pi/5, pi/2, 0.5, 0, 0]
+simplePath(start, stop)
 plt.show()
+
+#pp.pprint(np.around(fwd_kin[i],3))
