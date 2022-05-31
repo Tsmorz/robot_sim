@@ -8,6 +8,7 @@ write functions to:
 - sample-based path planning like RRT and PRM
 - implete a gripper for the tip of the robot
 - visualizing robot path with a line instead of axes
+- implement joint limits
 
 <p float="left">
   <img src=https://user-images.githubusercontent.com/83112082/171044843-b050536b-c731-43d7-847c-193f58297eab.gif width="45%" height="45%" />
