@@ -105,7 +105,7 @@ def initPlot():
 
 
 # plot each joint axes
-def plotAxes():
+def plotAxes(show_path):
     # draw x-y-z axes at joints
     def getJointAxes(theta):
         x = []
@@ -175,11 +175,13 @@ def plotAxes():
             ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
                 color=colors[i], length=0.2, normalize=True)
         else:
-            if i>=len(x)-3:
+            if show_path:
+                if i>=len(x)-3:
+                    ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
+                        color=colors[i], length=0.1, normalize=True)
+            else:
                 ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
                     color=colors[i], length=0.1, normalize=True)
-            #ax.quiver(x[i], y[i], z[i], u[i], v[i], w[i],
-            #        color=colors[i], length=0.1, normalize=True)
 
 
 # plot each link
@@ -270,11 +272,11 @@ def animateJoints(theta, show_path):
     setJointPosition(theta)
 
     if show_path:
-        plotAxes()
+        plotAxes(show_path)
     else:
         plt.cla()
         initPlot()
-        plotAxes()
+        plotAxes(show_path)
         plotLinks()
         plt.pause(0.01)
 
@@ -282,7 +284,6 @@ def animateJoints(theta, show_path):
 def simplePath(start, stop, interval, show_path):
     joints = []
     for i in range(len(robot.theta)):
-        print(i)
 
         q = linspace(start[i], stop[i], interval)
         if i==0:
@@ -302,13 +303,15 @@ param_filename = 'ur16e.txt'
 #param_filename = '5R1P.txt'
 #param_filename = 'quad.txt'
 
+
 # Attaching 3D axis to the figure
 elev = 20
 azim = 60
 fig, ax = plt.subplots(subplot_kw=dict(projection="3d", elev=elev, azim=azim))
 
 global robot
-robot = readRobotParams(param_filename)
+filename = 'robot models/' + param_filename
+robot = readRobotParams(filename)
 
 global limit
 limit = 0.8
@@ -318,17 +321,26 @@ origin = np.zeros(len(robot.theta))
 home = [0, 0, 0, 0, 0, 0]
 
 start = home
-stop = [2*pi, 2*pi, 0, 0, 0, 0]
-interval = 80
+stop = [0, 1.8*pi, -0.5*pi, 0, 0, 0]
+stop = -2*pi*np.ones(6)
+#stop[0] = 0
+interval = 200
 
-simplePath(start, stop, interval, show_path=True)
-
+show_path = True
+simplePath(start, stop, interval, show_path)
 
 '''
+simplePath(stop, start, interval, show_path)
+simplePath(start, stop, interval, show_path)
+simplePath(stop, start, interval, show_path)
+simplePath(start, stop, interval, show_path)
+simplePath(stop, start, interval, show_path)
+'''
+'''
 for i in range(len(robot.theta)):
-    stop[i] = -pi
+    stop[i] = 2*pi
     simplePath(start, stop, interval, show_path=False)
-    simplePath(stop, start, interval, show_path=False)
+    #simplePath(stop, start, interval, show_path=False)
     stop[i] = home[i]
 '''
 plt.show()
