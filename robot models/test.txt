@@ -1,0 +1,5 @@
+UR16e
+joint	theta [rad] 	a [m] 	d [m] 	alpha [rad]
+R	0 	0 	-0.125 	1.5708
+R	0 	0.25 	0 	0
+R	0 	0.25 	0 	0
